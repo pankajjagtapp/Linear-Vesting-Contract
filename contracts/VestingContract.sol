@@ -96,6 +96,7 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         }
     }
 
+    event VestingStarted (uint256 cliff, uint256 duration);
     //Function to start Vesting Schedule. Parameters required are Cliff and Duration
 
     function startVestingSchedule(uint256 _cliff, uint256 _duration)
@@ -105,10 +106,9 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         require(isVestingStarted == false, "Vesting already started");
         require(
             _cliff > 0 && _duration > 0,
-            "cliff and duration should be greater than 0"
+            "Cliff and Duration should be greater than 0"
         );
 
-        // totalTokens = manager.balanceOf(address(this));
         totalTokens = manager.balance;
         cliff = _cliff;
         duration = _duration;
@@ -116,6 +116,8 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         startTime = block.timestamp;
 
         calculateTokensPerRole();
+
+        emit VestingStarted(cliff, duration);
     }
 
     // Function to calculate tokens for every Role.
@@ -171,9 +173,10 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         Beneficiaries[_beneficiary].isVestingRevoked = true;
     }
 
+    event TokensClaimed(address beneficiary, uint tokens);
     // Function to claim tokens. Also checks if tokens are bought twice in a month.
 
-    function claimToken() external nonReentrant {
+    function claimTokens() external nonReentrant {
         require(isVestingStarted == true, "Vesting is not started yet!");
         require(
             Beneficiaries[msg.sender].isBeneficiary == true,
@@ -207,5 +210,7 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         _transfer(manager, msg.sender, tokens);
         Beneficiaries[msg.sender].totalTokensClaimed += tokens;
         Beneficiaries[msg.sender].lastTimeClaimed = block.timestamp;
+
+        emit TokensClaimed(msg.sender, tokens);
     }
 }

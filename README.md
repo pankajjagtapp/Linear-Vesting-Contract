@@ -12,7 +12,7 @@ Create a Token Vesting Contract with 5% TGE for Advisors, 0 % TGE for Partnershi
 
 # Deployed Contract
 
-Contract is deployed at Rinkeby Network
+Contracts are deployed at Rinkeby Network
 
 1. Vesting contract is deployed at (0x0b2Ee12E44b6E78437c6eD4155a3B968c1252D65) 
 Etherscan link - https://rinkeby.etherscan.io/address/0x5F55546a199d904E2f356EE37cB18c0207AE2e8b
