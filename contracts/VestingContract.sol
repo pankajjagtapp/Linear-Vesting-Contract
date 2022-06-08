@@ -96,7 +96,8 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         }
     }
 
-    event VestingStarted (uint256 cliff, uint256 duration);
+    event VestingStarted(uint256 cliff, uint256 duration);
+
     //Function to start Vesting Schedule. Parameters required are Cliff and Duration
 
     function startVestingSchedule(uint256 _cliff, uint256 _duration)
@@ -173,7 +174,8 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
         Beneficiaries[_beneficiary].isVestingRevoked = true;
     }
 
-    event TokensClaimed(address beneficiary, uint tokens);
+    event TokensClaimed(address beneficiary, uint256 tokens);
+
     // Function to claim tokens. Also checks if tokens are bought twice in a month.
 
     function claimTokens() external nonReentrant {
