@@ -1,4 +1,5 @@
 const { expect } = require('chai');
+const { BigNumber } = require('ethers');
 const { ethers } = require('hardhat');
 
 describe('Vesting Contract', function () {
@@ -16,7 +17,8 @@ describe('Vesting Contract', function () {
 		const JagguTokenInstance = await hre.ethers.getContractFactory(
 			'JagguToken'
 		);
-		jagguToken = await JagguTokenInstance.deploy();
+		const totalSupply = BigNumber.from(10000000);
+		jagguToken = await JagguTokenInstance.deploy(totalSupply);
 		await jagguToken.deployed();
 
 		// For Vesting Contract
@@ -26,16 +28,20 @@ describe('Vesting Contract', function () {
 		vesting = await VestingContractInstance.deploy(jagguToken.address);
 		await vesting.deployed();
 
+		await jagguToken.transfer(
+			vesting.address,
+			jagguToken.balanceOf(manager.address)
+		);
+
 		await vesting.connect(manager).addBeneficiary(addr1.address, 0);
 		await vesting.connect(manager).addBeneficiary(addr2.address, 1);
 		await vesting.connect(manager).addBeneficiary(addr3.address, 2);
 	});
 
 	describe('Deployment', async () => {
-		it('Should give the total supply to the Manager', async () => {
-			const managerBalance = await jagguToken.balanceOf(manager.address);
-			expect(await jagguToken.totalSupply()).to.equal(managerBalance);
-		});
+		it('Should return the correct name', async () => {
+			expect(await jagguToken.name()).to.equal('JagguToken');
+		  });
 	});
 
 	describe('Transactions', async () => {
@@ -64,15 +70,18 @@ describe('Vesting Contract', function () {
 		});
 
 		it('Should claim tokens after cliff period ', async () => {
+			await vesting.startVestingSchedule(5, 15);
 
-			await vesting.startVestingSchedule(5,15);
-
-			await hre.network.provider.send("hardhat_mine", ["0x3e8", "0x3c"]);
-			const balanceBefore = await jagguToken.connect(addr1).balanceOf(addr1.address);
+			await hre.network.provider.send('hardhat_mine', ['0x3e8', '0x3c']);
+			const balanceBefore = await jagguToken
+				.connect(addr1)
+				.balanceOf(addr1.address);
 
 			await vesting.connect(addr1).claimTokens();
 
-			const balanceAfter = await jagguToken.connect(addr1).balanceOf(addr1.address);
+			const balanceAfter = await jagguToken
+				.connect(addr1)
+				.balanceOf(addr1.address);
 
 			expect(balanceBefore).to.be.not.equal(balanceAfter);
 		});
