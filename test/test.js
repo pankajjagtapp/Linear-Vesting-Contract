@@ -60,7 +60,21 @@ describe('Vesting Contract', function () {
 				22 * 30 * 24 * 60 * 60
 			);
 
-			expect(vesting.connect(addr1).claimToken()).to.be.revertedWith();
+			expect(vesting.connect(addr1).claimTokens()).to.be.revertedWith();
+		});
+
+		it('Should claim tokens after cliff period ', async () => {
+
+			await vesting.startVestingSchedule(5,15);
+
+			await hre.network.provider.send("hardhat_mine", ["0x3e8", "0x3c"]);
+			const balanceBefore = await jagguToken.connect(addr1).balanceOf(addr1.address);
+
+			await vesting.connect(addr1).claimTokens();
+
+			const balanceAfter = await jagguToken.connect(addr1).balanceOf(addr1.address);
+
+			expect(balanceBefore).to.be.not.equal(balanceAfter);
 		});
 	});
 });

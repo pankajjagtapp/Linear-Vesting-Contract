@@ -6,9 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract JagguToken is ERC20 {
 
-    address public manager;
-
-    constructor() ERC20("JagguToken", "JAGGU") {
-        manager = msg.sender;
+    constructor(uint256 initialSupply) ERC20("JagguToken", "JAGGU") {
+         _mint(msg.sender, initialSupply * 10 ** decimals());
     }
 }

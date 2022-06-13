@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./JagguToken.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
+contract VestingContract is Ownable, ReentrancyGuard {
     uint256 private start;
     uint256 private cliff;
     uint256 private duration;
     uint256 private totalTokens;
     bool public isVestingStarted;
 
+    IERC20 private token;
     // 3 Roles - Advisors, Partners, Mentors
     uint256 private tokensPerAdvisor;
     uint256 private tokensPerPartner;
@@ -29,45 +29,47 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
 
     uint256 private startTime;
 
-    enum Roles {
-        advisor,
-        partner,
-        mentor
-    }
+    event BeneficiaryAdded(address beneficiary, Roles role);
+    event VestingStarted(uint256 cliff, uint256 duration);
+    event TokensClaimed(address beneficiary, uint256 tokens);
 
     struct Beneficiary {
-        uint256 role;
+        Roles role;
         uint256 totalTokensClaimed;
         uint256 lastTimeClaimed;
         bool isBeneficiary;
         bool isVestingRevoked;
     }
 
-    mapping(address => Beneficiary) public Beneficiaries;
+    enum Roles {
+        advisor,
+        partner,
+        mentor
+    }
 
-    constructor(uint256 _totalSupply) {
-        _mint(manager, _totalSupply * 10**18);
+    mapping(address => Beneficiary) public beneficiaries;
+
+    constructor(address _token) {
+        token = IERC20(_token);
     }
 
     // Function to set Dynamic TGE for different Roles
-    function setTGEforRoles(uint256 _role, uint256 _percent)
+    function setTGEforRoles(Roles _role, uint256 _percent)
         external
         onlyOwner
     {
-        if (_role == 0) {
+        if (_role == Roles.advisor) {
             percentTGEAdvisors = _percent;
-        } else if (_role == 1) {
+        } else if (_role == Roles.partner) {
             percentTGEPartners = _percent;
         } else {
             percentTGEMentors = _percent;
         }
     }
 
-    event BeneficiaryAdded(address beneficiary, uint256 role);
-
     // Function to add new Beneficiary. Only Owner can do this.
 
-    function addBeneficiary(address _beneficiary, uint256 _role)
+    function addBeneficiary(address _beneficiary, Roles _role)
         external
         onlyOwner
     {
@@ -76,27 +78,24 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
             "Cannot add a Beneficiary of 0 address"
         );
         require(
-            Beneficiaries[_beneficiary].isBeneficiary == false,
+            beneficiaries[_beneficiary].isBeneficiary == false,
             "Beneficiary already added"
         );
-        require(_role < 3, "Only 3 roles available");
         require(isVestingStarted == false, "Vesting already started");
 
-        Beneficiaries[_beneficiary].role = _role;
-        Beneficiaries[_beneficiary].isBeneficiary = true;
+        beneficiaries[_beneficiary].role = _role;
+        beneficiaries[_beneficiary].isBeneficiary = true;
 
         emit BeneficiaryAdded(_beneficiary, _role);
 
-        if (_role == 0) {
+        if (_role == Roles.advisor) {
             totalAdvisors++;
-        } else if (_role == 1) {
+        } else if (_role == Roles.partner) {
             totalPartners++;
         } else {
             totalMentors++;
         }
     }
-
-    event VestingStarted(uint256 cliff, uint256 duration);
 
     //Function to start Vesting Schedule. Parameters required are Cliff and Duration
 
@@ -110,47 +109,44 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
             "Cliff and Duration should be greater than 0"
         );
 
-        totalTokens = manager.balance;
+        totalTokens = token.balanceOf(address(this));
         cliff = _cliff;
         duration = _duration;
         isVestingStarted = true;
         startTime = block.timestamp;
 
-        calculateTokensPerRole();
+        _calculateTokensPerRole();
 
         emit VestingStarted(cliff, duration);
     }
 
     // Function to calculate tokens for every Role.
 
-    function calculateTokensPerRole() private {
-        tokensPerAdvisor =
-            ((totalTokens * percentTGEAdvisors) / denominator) *
-            totalAdvisors;
-        tokensPerPartner =
-            ((totalTokens * percentTGEPartners) / denominator) *
-            totalPartners;
-        tokensPerMentor =
-            ((totalTokens * percentTGEMentors) / denominator) *
-            totalMentors;
+    function _calculateTokensPerRole() internal {
+        tokensPerAdvisor = ((totalTokens * percentTGEAdvisors * totalAdvisors) /
+            denominator);
+        tokensPerPartner = ((totalTokens * percentTGEPartners * totalPartners) /
+            denominator);
+        tokensPerMentor = ((totalTokens * percentTGEMentors * totalMentors) /
+            denominator);
     }
 
     // Function to tell the remaining claimable tokens
 
     function claimableTokens() public view returns (uint256) {
-        uint256 _role = Beneficiaries[msg.sender].role;
+        Roles _role = beneficiaries[msg.sender].role;
         uint256 _tokensAvailable;
-        uint256 _claimedTokens = Beneficiaries[msg.sender].totalTokensClaimed;
+        uint256 _claimedTokens = beneficiaries[msg.sender].totalTokensClaimed;
 
         uint256 Time = block.timestamp - startTime - cliff;
 
-        if (_role == 0) {
+        if (_role == Roles.advisor) {
             if (Time >= duration) {
                 _tokensAvailable = tokensPerAdvisor;
             } else {
                 _tokensAvailable = (tokensPerAdvisor * Time) / duration;
             }
-        } else if (_role == 1) {
+        } else if (_role == Roles.partner) {
             if (Time >= duration) {
                 _tokensAvailable = tokensPerPartner;
             } else {
@@ -168,24 +164,22 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
 
     function revokeVesting(address _beneficiary) external onlyOwner {
         require(
-            !Beneficiaries[_beneficiary].isVestingRevoked,
+            !beneficiaries[_beneficiary].isVestingRevoked,
             "Vesting Schedule already Revoked"
         );
-        Beneficiaries[_beneficiary].isVestingRevoked = true;
+        beneficiaries[_beneficiary].isVestingRevoked = true;
     }
-
-    event TokensClaimed(address beneficiary, uint256 tokens);
 
     // Function to claim tokens. Also checks if tokens are bought twice in a month.
 
     function claimTokens() external nonReentrant {
         require(isVestingStarted == true, "Vesting is not started yet!");
         require(
-            Beneficiaries[msg.sender].isBeneficiary == true,
+            beneficiaries[msg.sender].isBeneficiary == true,
             "You are not a beneficiary"
         );
         require(
-            Beneficiaries[msg.sender].isVestingRevoked == false,
+            beneficiaries[msg.sender].isVestingRevoked == false,
             "Your vesting has been Revoked"
         );
         require(
@@ -193,25 +187,25 @@ contract VestingContract is JagguToken, Ownable, ReentrancyGuard {
             "Vesting is still in cliff period"
         );
         require(
-            block.timestamp - Beneficiaries[msg.sender].lastTimeClaimed >
+            block.timestamp - beneficiaries[msg.sender].lastTimeClaimed >
                 30 * 24 * 60 * 60, // seconds in a month
             "You have already claimed tokens within last month"
         );
-        uint256 _role = Beneficiaries[msg.sender].role;
-        uint256 claimedToken = Beneficiaries[msg.sender].totalTokensClaimed;
+        Roles _role = beneficiaries[msg.sender].role;
+        uint256 claimedToken = beneficiaries[msg.sender].totalTokensClaimed;
 
-        if (_role == 0) {
+        if (_role == Roles.advisor) {
             require(claimedToken < tokensPerAdvisor, "All Tokens Claimed");
-        } else if (_role == 1) {
+        } else if (_role == Roles.partner) {
             require(claimedToken < tokensPerPartner, "All Tokens Claimed");
         } else {
             require(claimedToken < tokensPerMentor, "All Tokens Claimed");
         }
         uint256 tokens = claimableTokens();
 
-        _transfer(manager, msg.sender, tokens);
-        Beneficiaries[msg.sender].totalTokensClaimed += tokens;
-        Beneficiaries[msg.sender].lastTimeClaimed = block.timestamp;
+        token.transfer(msg.sender, tokens);
+        beneficiaries[msg.sender].totalTokensClaimed += tokens;
+        beneficiaries[msg.sender].lastTimeClaimed = block.timestamp;
 
         emit TokensClaimed(msg.sender, tokens);
     }
