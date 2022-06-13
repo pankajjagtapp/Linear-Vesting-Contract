@@ -54,6 +54,22 @@ contract VestingContract is Ownable, ReentrancyGuard {
         token = IERC20(_token);
     }
 
+    // Function to tell the remaining claimable tokens for a beneficiary.
+
+    function claimableTokens() public returns (uint256) {
+        Roles _role = beneficiaries[msg.sender].role;
+        uint256 _claimedTokens = beneficiaries[msg.sender].totalTokensClaimed;
+
+        if (_role == Roles.advisor) {
+            tokensAvailable = getAvailableTokens(tokensPerAdvisor);
+        } else if (_role == Roles.partner) {
+            tokensAvailable = getAvailableTokens(tokensPerPartner);
+        } else {
+            tokensAvailable = getAvailableTokens(tokensPerMentor);
+        }
+        return tokensAvailable - _claimedTokens;
+    }
+
     // Function to set Dynamic TGE for different Roles
     function setTGEforRoles(Roles _role, uint256 _percent) external onlyOwner {
         if (_role == Roles.advisor) {
@@ -117,53 +133,6 @@ contract VestingContract is Ownable, ReentrancyGuard {
 
         emit VestingStarted(cliff, duration);
     }
-
-    // Function to tell the remaining claimable tokens for a beneficiary.
-
-    function claimableTokens() public returns (uint256) {
-        Roles _role = beneficiaries[msg.sender].role;
-        uint256 _claimedTokens = beneficiaries[msg.sender].totalTokensClaimed;
-
-        if (_role == Roles.advisor) {
-            tokensAvailable = getAvailableTokens(tokensPerAdvisor);
-        } else if (_role == Roles.partner) {
-            tokensAvailable = getAvailableTokens(tokensPerPartner);
-        } else {
-            tokensAvailable = getAvailableTokens(tokensPerMentor);
-        }
-        return tokensAvailable - _claimedTokens;
-    }
-
-    // Function to tell the remaining claimable tokens
-
-    // function claimableTokens() public view returns (uint256) {
-    //     Roles _role = beneficiaries[msg.sender].role;
-    //     uint256 tokensAvailable;
-    //     uint256 _claimedTokens = beneficiaries[msg.sender].totalTokensClaimed;
-
-    //     uint256 Time = block.timestamp - startTime - cliff;
-
-    //     if (_role == Roles.advisor) {
-    //         if (Time >= duration) {
-    //             tokensAvailable = tokensPerAdvisor;
-    //         } else {
-    //             tokensAvailable = (tokensPerAdvisor * Time) / duration;
-    //         }
-    //     } else if (_role == Roles.partner) {
-    //         if (Time >= duration) {
-    //             tokensAvailable = tokensPerPartner;
-    //         } else {
-    //             tokensAvailable = (tokensPerPartner * Time) / duration;
-    //         }
-    //     } else {
-    //         if (Time >= duration) {
-    //             tokensAvailable = tokensPerMentor;
-    //         } else {
-    //             tokensAvailable = (tokensPerMentor * Time) / duration;
-    //         }
-    //     }
-    //     return tokensAvailable - _claimedTokens;
-    // }
 
     function revokeVesting(address _beneficiary) external onlyOwner {
         require(
